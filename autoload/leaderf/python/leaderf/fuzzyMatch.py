@@ -39,6 +39,8 @@ class FuzzyMatch(object):
                 self._pattern_mask[c] ^= (1 << i)
             else:
                 self._pattern_mask[c] = ~0 ^ (1 << i)
+            if c.islower() and c.upper() in self._pattern_mask:
+                self._pattern_mask[c.upper()] ^= (1 << i)
 
     @staticmethod
     def evaluate(text, pattern, text_mask, j, pattern_mask, k, val):
