@@ -643,13 +643,14 @@ static PyObject* fuzzyMatchC_initPattern(PyObject* self, PyObject* args)
     return PyCapsule_New(pCtxt, NULL, delPatternContext);
 }
 
-static PyObject* fuzzyMatchC_getWeight(PyObject* self, PyObject* args)
+static PyObject* fuzzyMatchC_getWeight(PyObject* self, PyObject* args, PyObject* kwargs)
 {
     char* text;
     Py_ssize_t text_len;
     PyObject* py_patternCtxt;
+    static char* kwlist[] = {"text", "pattern", NULL};
 
-    if ( !PyArg_ParseTuple(args, "s#O:getWeight", &text, &text_len, &py_patternCtxt) )
+    if ( !PyArg_ParseTupleAndKeywords(args, kwargs, "s#O:getWeight", kwlist, &text, &text_len, &py_patternCtxt) )
         return NULL;
 
     PatternContext* pCtxt = (PatternContext*)PyCapsule_GetPointer(py_patternCtxt, NULL);
@@ -661,8 +662,8 @@ static PyObject* fuzzyMatchC_getWeight(PyObject* self, PyObject* args)
 
 static PyMethodDef fuzzyMatchC_Methods[] =
 {
-    { "initPattern", fuzzyMatchC_initPattern, METH_VARARGS, "initialize the pattern." },
-    { "getWeight", fuzzyMatchC_getWeight, METH_VARARGS, "" },
+    { "initPattern", (PyCFunction)fuzzyMatchC_initPattern, METH_VARARGS, "initialize the pattern." },
+    { "getWeight", (PyCFunction)fuzzyMatchC_getWeight, METH_VARARGS | METH_KEYWORDS, "" },
     { NULL, NULL, 0, NULL }
 };
 

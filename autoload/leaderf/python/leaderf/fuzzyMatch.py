@@ -51,12 +51,17 @@ class FuzzyMatch(object):
         # e.g., text = '~ab~~_abd~b~d', pattern = 'abbd'
         if k in val and val[k][2] > j + 1:
             return val[k]
+
+        text_len = len(text)
+        pattern_len = len(pattern)
         max_prefix_score = max_score = beg = end = 0
+
         i = (x & -x).bit_length() - 1
         if i == 0 or text[i-1] in '_- ':
             special = 2
         elif text[i].isupper():
-            special = 2 if not text[i-1].isupper() else 0
+            special = 2 if not text[i-1].isupper() or \
+                            i+1 < text_len and text[i+1].islower() else 0
         elif text[i-1] == '.':
             special = 1.9
         # elif text[i-1] in '/\\':
@@ -65,10 +70,9 @@ class FuzzyMatch(object):
             special = 2
         else:
             special = 0
+
         d = -2      # -0b10 or ~1
         i += 1
-        text_len = len(text)
-        pattern_len = len(pattern)
         while i < text_len:
             last = d
             c = text[i]
@@ -121,7 +125,8 @@ class FuzzyMatch(object):
                 else:
                     i += (y & -y).bit_length() - 1
                     if text[i].isupper():
-                        special = 2 if not text[i-1].isupper() else 0
+                        special = 2 if not text[i-1].isupper() or \
+                                        i+1 < text_len and text[i+1].islower() else 0
                     elif text[i-1] in '_- ':
                         special = 2
                     elif text[i-1] == '.':
@@ -491,13 +496,18 @@ class FuzzyMatch(object):
         # e.g., text = 'a~bc~d~~ab~~d~', pattern = 'abcd'
         if x == 0:
             return (0, [])
+
+        text_len = len(text)
+        pattern_len = len(pattern)
         max_prefix_score = max_score = 0
         highlights = []
+
         i = (x & -x).bit_length() - 1
         if i == 0 or text[i-1] in '_- ':
             special = 2
         elif text[i].isupper():
-            special = 2 if not text[i-1].isupper() else 0
+            special = 2 if not text[i-1].isupper() or \
+                            i+1 < text_len and text[i+1].islower() else 0
         elif text[i-1] == '.':
             special = 1.9
         # elif text[i-1] in '/\\':
@@ -506,10 +516,9 @@ class FuzzyMatch(object):
             special = 2
         else:
             special = 0
+
         d = -2      # -0b10 or ~1
         i += 1
-        text_len = len(text)
-        pattern_len = len(pattern)
         while i < text_len:
             last = d
             c = text[i]
@@ -560,7 +569,8 @@ class FuzzyMatch(object):
                 else:
                     i += (y & -y).bit_length() - 1
                     if text[i].isupper():
-                        special = 2 if not text[i-1].isupper() else 0
+                        special = 2 if not text[i-1].isupper() or \
+                                        i+1 < text_len and text[i+1].islower() else 0
                     elif text[i-1] in '_- ':
                         special = 2
                     elif text[i-1] == '.':

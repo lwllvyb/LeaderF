@@ -13,28 +13,29 @@ from .cli import LfCli
 from .utils import *
 from .fuzzyMatch import FuzzyMatch
 
-is_C_fuzzyMatch = False
+
+is_fuzzyMatch_C = False
 try:
     import fuzzyMatchC
-    is_C_fuzzyMatch = True
+    is_fuzzyMatch_C = True
     lfCmd("let g:Lf_fuzzyMatch_C = 1")
 except ImportError:
     lfCmd("let g:Lf_fuzzyMatch_C = 0")
 
 if sys.version_info >= (3, 0):
-    def fuzzyCalculator(fuzzy_match, text, pattern):
+    def isAscii(str):
         try:
-            text.encode("ascii")
-            return fuzzyMatchC.getWeight(text, pattern)
+            str.encode("ascii")
+            return True
         except UnicodeEncodeError:
-            return fuzzy_match.getWeight(text)
+            return False
 else:
-    def fuzzyCalculator(fuzzy_match, text, pattern):
+    def isAscii(str):
         try:
-            text.decode("ascii")
-            return fuzzyMatchC.getWeight(text, pattern)
+            str.decode("ascii")
+            return True
         except UnicodeDecodeError:
-            return fuzzy_match.getWeight(text)
+            return False
 
 
 def modifiableController(func):
@@ -356,13 +357,15 @@ class Manager(object):
 
     def _fuzzySearch(self, content, is_continue, step):
         encoding = lfEval("&encoding")
+        is_ascii = False
         if self._cli.isRefinement:
             if self._cli.pattern[1] == '':      # e.g. abc;
                 fuzzy_match = FuzzyMatch(self._cli.pattern[0], encoding)
                 getWeight = fuzzy_match.getWeight
-                if is_C_fuzzyMatch:
+                if is_fuzzyMatch_C and isAscii(self._cli.pattern[0]):
+                    is_ascii = True
                     pattern = fuzzyMatchC.initPattern(self._cli.pattern[0])
-                    getWeight = partial(fuzzyCalculator, fuzzy_match, pattern=pattern)
+                    getWeight = partial(fuzzyMatchC.getWeight, pattern=pattern)
 
                 filter_method = partial(self._fuzzyFilter, False, getWeight)
                 highlight_method = partial(self._highlight,
@@ -371,9 +374,10 @@ class Manager(object):
             elif self._cli.pattern[0] == '':    # e.g. ;abc
                 fuzzy_match = FuzzyMatch(self._cli.pattern[1], encoding)
                 getWeight = fuzzy_match.getWeight
-                if is_C_fuzzyMatch:
+                if is_fuzzyMatch_C and isAscii(self._cli.pattern[1]):
+                    is_ascii = True
                     pattern = fuzzyMatchC.initPattern(self._cli.pattern[1])
-                    getWeight = partial(fuzzyCalculator, fuzzy_match, pattern=pattern)
+                    getWeight = partial(fuzzyMatchC.getWeight, pattern=pattern)
 
                 filter_method = partial(self._fuzzyFilter, True, getWeight)
                 highlight_method = partial(self._highlight,
@@ -384,11 +388,20 @@ class Manager(object):
                 getWeight0 = fuzzy_match0.getWeight
                 fuzzy_match1 = FuzzyMatch(self._cli.pattern[1], encoding)
                 getWeight1 = fuzzy_match1.getWeight
-                if is_C_fuzzyMatch:
-                    pattern0 = fuzzyMatchC.initPattern(self._cli.pattern[0])
-                    getWeight0 = partial(fuzzyCalculator, fuzzy_match0, pattern=pattern0)
-                    pattern1 = fuzzyMatchC.initPattern(self._cli.pattern[1])
-                    getWeight1 = partial(fuzzyCalculator, fuzzy_match1, pattern=pattern1)
+                if is_fuzzyMatch_C:
+                    if isAscii(self._cli.pattern[0]):
+                        is_ascii0 = True
+                        pattern0 = fuzzyMatchC.initPattern(self._cli.pattern[0])
+                        getWeight0 = partial(fuzzyCalculator, fuzzy_match0, pattern=pattern0)
+                    else:
+                        is_ascii0 = False
+                    if isAscii(self._cli.pattern[1]):
+                        is_ascii1 = True
+                        pattern1 = fuzzyMatchC.initPattern(self._cli.pattern[1])
+                        getWeight1 = partial(fuzzyCalculator, fuzzy_match1, pattern=pattern1)
+                    else:
+                        is_ascii1 = False
+                    is_ascii = is_ascii0 and is_ascii1
 
                 filter_method = partial(self._refineFilter, getWeight0, getWeight1)
                 highlight_method = partial(self._highlightRefine,
@@ -396,9 +409,11 @@ class Manager(object):
                                            fuzzy_match1.getHighlights)
         else:
             fuzzy_match = FuzzyMatch(self._cli.pattern, encoding)
-            if is_C_fuzzyMatch:
+            if is_fuzzyMatch_C and isAscii(self._cli.pattern):
+                is_ascii = True
                 pattern = fuzzyMatchC.initPattern(self._cli.pattern)
-                getWeight = partial(fuzzyCalculator, fuzzy_match, pattern=pattern)
+                getWeight = partial(fuzzyMatchC.getWeight, pattern=pattern)
+
                 filter_method = partial(self._fuzzyFilter, self._cli.isFullPath, getWeight)
             else:
                 if self._getExplorer().getStlCategory() == "File" and self._cli.isFullPath:
@@ -419,10 +434,10 @@ class Manager(object):
                                        self._cli.isFullPath,
                                        fuzzy_match.getHighlights)
 
-        if self._getExplorer().isFilePath() and self._cli.isFullPath and step == 30000:
-            if is_C_fuzzyMatch:
+        if step == 30000:
+            if is_fuzzyMatch_C and is_ascii:
                 step = 50000
-            else:
+            elif self._getExplorer().isFilePath() and self._cli.isFullPath:
                 step = 5000
 
         pairs = self._filter(step, filter_method, content, is_continue)
