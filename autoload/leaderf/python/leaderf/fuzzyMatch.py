@@ -49,7 +49,7 @@ class FuzzyMatch(object):
         if x == 0:
             return (0, 0, 0)
         # e.g., text = '~ab~~_abd~b~d', pattern = 'abbd'
-        if k in val and val[k][2] > j + 1:
+        if k in val and val[k][1] > j:
             return val[k]
 
         text_len = len(text)
@@ -113,7 +113,7 @@ class FuzzyMatch(object):
                         score = 0
                 if score > max_score or special and score == max_score:
                     max_score = score
-                    beg = i - n
+                    beg = j + i - n
                     end = end_pos
             # e.g., text = 'a~c~~~~ab~c', pattern = 'abc',
             # to find the index of the second 'a'
@@ -147,7 +147,7 @@ class FuzzyMatch(object):
                 score = pattern_len*pattern_len + special
                 if score > max_score:
                     max_score = score
-                    beg = i - pattern_len
+                    beg = j + i - pattern_len
                     end = j + i
         val[k] = (max_score, beg, end)
         return val[k]
