@@ -228,10 +228,10 @@ ValueElements* evaluate(TextContext* pText_ctxt,
     }
 
     /**
-     * e.g., text = '~ab~~_abd~b~d', pattern = 'abbd'
-     * val[k].end > 0 means k in val
+     * e.g., text = '~abc~~AbcD~~', pattern = 'abcd'
+     * j > 0 means val[k].beg > 0, means k in val
      */
-    if ( val[k].beg > j )
+    if ( j > 0 and val[k].beg >= j )
         return val + k;
 
     uint16_t beg = 0;

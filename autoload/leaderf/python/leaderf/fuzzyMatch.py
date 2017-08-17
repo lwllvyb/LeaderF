@@ -48,8 +48,8 @@ class FuzzyMatch(object):
         # e.g., text = 'a~bc~d~~ab~~d~', pattern = 'abcd'
         if x == 0:
             return (0, 0, 0)
-        # e.g., text = '~ab~~_abd~b~d', pattern = 'abbd'
-        if k in val and val[k][1] > j:
+        # e.g., text = '~abc~~AbcD~~', pattern = 'abcd'
+        if k in val and val[k][1] >= j:
             return val[k]
 
         text_len = len(text)
@@ -57,7 +57,7 @@ class FuzzyMatch(object):
         max_prefix_score = max_score = beg = end = 0
 
         i = (x & -x).bit_length() - 1
-        if i == 0 or text[i-1] in '_- ':
+        if j + i == 0 or text[i-1] in '_- ':
             special = 2
         elif text[i].isupper():
             special = 2 if not text[i-1].isupper() or \
@@ -89,7 +89,7 @@ class FuzzyMatch(object):
                 if n == pattern_len:
                     score = n*n + special
                     if special == 2:
-                        val[k] = (score, i-n, j+i)
+                        val[k] = (score, j+i-n, j+i)
                         return val[k]
                     else:
                         end_pos = j + i
