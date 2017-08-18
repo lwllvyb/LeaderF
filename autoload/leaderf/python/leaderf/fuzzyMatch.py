@@ -503,7 +503,7 @@ class FuzzyMatch(object):
         highlights = []
 
         i = (x & -x).bit_length() - 1
-        if i == 0 or text[i-1] in '_- ':
+        if j + i == 0 or text[i-1] in '_- ':
             special = 2
         elif text[i].isupper():
             special = 2 if not text[i-1].isupper() or \
