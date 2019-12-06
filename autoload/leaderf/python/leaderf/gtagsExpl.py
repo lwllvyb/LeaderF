@@ -258,7 +258,7 @@ class GtagsExplorer(Explorer):
                     executor = AsyncExecutor()
                     self._executor.append(executor)
                     content += executor.execute(cmd, env=env)
-
+        self._last_command = cmd
         if auto_jump:
             first_two = list(itertools.islice(content, 2))
             if len(first_two) == 1:
