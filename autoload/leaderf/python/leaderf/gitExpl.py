@@ -3250,13 +3250,14 @@ class NavigationPanel(Panel):
 
     def open(self):
         navigation_winid = self.getWindowId()
+        tree_view_id = int(lfEval("b:lf_tree_view_id"))
+        current_file_path = vim.current.buffer.name.rsplit(':', 1)[1]
         if navigation_winid != -1:
             lfCmd("call win_gotoid({})".format(navigation_winid))
+            ctypes.cast(tree_view_id, ctypes.py_object).value.locateFile(current_file_path)
             return
 
-        tree_view_id = int(lfEval("b:lf_tree_view_id"))
         buffer_name = self._buffer.name
-        current_file_path = vim.current.buffer.name.rsplit(':', 1)[1]
         win_pos = self._arguments.get("--navigation-position", ["left"])[0]
         if win_pos == 'top':
             height = int(float(lfEval("get(g:, 'Lf_GitNavigationPanelHeight', &lines * 0.3)")))
