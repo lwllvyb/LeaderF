@@ -1217,7 +1217,8 @@ class Bisect(object):
 class TreeView(GitCommandView):
     def __init__(self, owner, cmd, project_root, target_path, callback,
                  next_tree_view=None,
-                 content_buffer=None):
+                 content_buffer=None,
+                 cursor_line=None):
         super(TreeView, self).__init__(owner, cmd)
         self._project_root = project_root
         self._target_path = target_path
@@ -1226,6 +1227,7 @@ class TreeView(GitCommandView):
         self._callback = callback
         self._next_tree_view = next_tree_view
         self._content_buffer = content_buffer
+        self._cursor_line = cursor_line
         # key is the parent hash, value is a TreeNode
         self._trees = LfOrderedDict()
         # key is the parent hash, value is a list of MetaInfo
@@ -1835,11 +1837,15 @@ class TreeView(GitCommandView):
                             if self._target_path is None or info.path == self._target_path:
                                 if self._content_buffer is not None:
                                     cursor_line = len(self._content_buffer)
+                                    if self._cursor_line is not None:
+                                        self._cursor_line[0] = cursor_line
                                 else:
                                     cursor_line = len(self._buffer)
                                 source = info.info
 
-                    if source is not None and self._callback(source, tree_view_id=id(self)) == True:
+                    if (source is not None and self._callback(source,
+                                                              tree_view_id=id(self),
+                                                              title=self.getTitle()) == True):
                         if lfEval("has('nvim')") == '1':
                             lfCmd("call nvim_win_set_option({}, 'cursorline', v:true)"
                                   .format(self.getWindowId()))
@@ -1884,13 +1890,22 @@ class TreeView(GitCommandView):
         index = line_num - self.startLine()
         structure = self._file_structures[self._cur_parent]
         if index < -1 or index >= len(structure):
-            return None
+            return (None, None, None)
 
         # the root
         if index == -1:
-            return "./"
+            return ("./", None, None)
         else:
-            return structure[index].path
+            path = structure[index].path
+            if structure[index].is_dir:
+                file_info = self.getLeftMostFile(structure[index].info)
+                if file_info is None:
+                    return (path, None, None)
+                else:
+                    return (path, file_info[2], file_info[3])
+            else:
+                change_type = structure[index].info[2]
+                return (path, change_type, path)
 
     def _readContent(self, encoding):
         try:
@@ -2827,7 +2842,7 @@ class NavigationPanel(Panel):
         self._owner = owner
         self._project_root = project_root
         self._commit_id = commit_id
-        self._tree_view = []
+        self._tree_views = []
         self._bufhidden_cb = bufhidden_callback
         self._is_hidden = False
         self._arguments = {}
@@ -2862,7 +2877,7 @@ class NavigationPanel(Panel):
 
     def startLine(self, tree_view):
         n = len(self._head) + 1
-        for view in self._tree_view:
+        for view in self._tree_views:
             if view.getHeight() > 0:
                 n += view.getTitleHeight() + 2
 
@@ -2876,7 +2891,7 @@ class NavigationPanel(Panel):
     def getTreeView(self):
         line_num = int(lfEval("getcurpos({})[1]".format(self.getWindowId())))
         n = len(self._head) + 1
-        for view in self._tree_view:
+        for view in self._tree_views:
             if view.getHeight() > 0:
                 n += view.getTitleHeight() + view.getHeight() + 2
                 if line_num <= n:
@@ -2892,7 +2907,7 @@ class NavigationPanel(Panel):
         return self._diff_algorithm
 
     def register(self, view):
-        self._tree_view.append(view)
+        self._tree_views.append(view)
 
     def bufHidden(self, view):
         self._is_hidden = True
@@ -2903,10 +2918,10 @@ class NavigationPanel(Panel):
         return self._is_hidden
 
     def cleanup(self):
-        for view in self._tree_view:
+        for view in self._tree_views:
             if view is not None:
                 view.cleanup()
-        self._tree_view = []
+        self._tree_views = []
 
     def enableColor(self, winid):
         self._match_id_winid = winid
@@ -3278,7 +3293,7 @@ class NavigationPanel(Panel):
         lfCmd("call setmatches(b:lf_navigation_matches)")
         lfCmd("setlocal winfixwidth | wincmd =")
         self._is_hidden = False
-        if len(self._tree_view) == 1:
+        if len(self._tree_views) == 1:
             self.getTreeView().locateFile(current_file_path)
         else:
             ctypes.cast(tree_view_id, ctypes.py_object).value.locateFile(current_file_path)
@@ -3329,21 +3344,28 @@ class NavigationPanel(Panel):
         if tree_view is None:
             return
 
-        path = tree_view.getFilePath()
+        path, change_type, target_path = tree_view.getFilePath()
         if path is None:
             return
 
         if tree_view.getTitle() == "Staged Changes:":
+            if change_type == "A":
+                title =  "Untracked files:"
+            else:
+                title = "Unstaged Changes:"
+
             if os.name == 'nt':
                 cmd = 'git reset -q HEAD -- "{}"'.format(path)
             else:
                 cmd = "git reset -q HEAD -- {}".format(escSpecial(path))
         elif tree_view.getTitle() == "Unstaged Changes:":
+            title = "Staged Changes:"
             if os.name == 'nt':
                 cmd = 'git add -u "{}"'.format(path)
             else:
                 cmd = "git add -u {}".format(escSpecial(path))
         elif tree_view.getTitle() == "Untracked files:":
+            title = "Staged Changes:"
             if os.name == 'nt':
                 if not path.endswith("/"):
                     cmd = 'git add "{}"'.format(path)
@@ -3359,36 +3381,45 @@ class NavigationPanel(Panel):
 
         ParallelExecutor.run(cmd, directory=self._project_root)
 
-        self.updateTreeview()
+        self.updateTreeview(title, target_path)
 
-    def updateTreeview(self):
-        for view in self._tree_view:
+    def updateTreeview(self, title=None, target_path=None):
+        for view in self._tree_views:
             if view is not None:
                 view.cleanup(wipe=False)
-        self._tree_view = []
+        self._tree_views = []
 
         flag = [False]
-        def wrapper(cb, flag, *args, **kwargs):
-            if flag[0] == False:
-                flag[0] = True
-                cb(*args, **kwargs)
+
+        def callback(source, **kwargs):
+            if title is None:
+                if flag[0] == False:
+                    flag[0] = True
+                    kwargs["source_to_open"] = source
+                    kwargs["preview"] = True
+                    self.openDiffView(False, **kwargs)
+                    return True
+                else:
+                    return False
+            elif kwargs["title"] == title:
+                kwargs["source_to_open"] = source
+                kwargs["preview"] = True
+                self.openDiffView(False, **kwargs)
                 return True
             else:
                 return False
 
-        def callback(source, **kwargs):
-            kwargs["source_to_open"] = source
-            self.openDiffView(False, **kwargs)
-
         content_buffer = self._buffer[:len(self._head)]
+        cursor_line = [None]
         def createTreeView(cmds):
             if len(cmds) > 0:
                 TreeView(self, cmds[0],
                          self._project_root,
-                         None,
-                         partial(wrapper, callback, flag),
+                         target_path,
+                         callback,
                          next_tree_view=partial(createTreeView, cmds[1:]),
-                         content_buffer=content_buffer
+                         content_buffer=content_buffer,
+                         cursor_line=cursor_line
                          ).create(int(lfEval("win_getid()")), bufhidden="hide")
             else:
                 cur_pos = vim.current.window.cursor
@@ -3399,6 +3430,9 @@ class NavigationPanel(Panel):
                     vim.current.window.cursor = cur_pos
                 except:
                     pass
+
+                if target_path is not None and cursor_line[0] is not None:
+                    lfCmd("norm! {}G0zz".format(cursor_line[0]))
 
                 if len(self._buffer) == len(self._head):
                     lfCmd("only")
@@ -3434,7 +3468,7 @@ class NavigationPanel(Panel):
         if tree_view is None:
             return
 
-        path = tree_view.getFilePath()
+        path, change_type, _ = tree_view.getFilePath()
         if path is None:
             return
 
