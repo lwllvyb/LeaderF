@@ -1886,26 +1886,32 @@ class TreeView(GitCommandView):
             self._buffer.options['modifiable'] = False
 
     def getFilePath(self):
+        """
+        return (path, meta_info)
+        """
         line_num = vim.current.window.cursor[0]
         index = line_num - self.startLine()
         structure = self._file_structures[self._cur_parent]
         if index < -1 or index >= len(structure):
-            return (None, None, None)
+            return (None, None)
 
         # the root
         if index == -1:
-            return ("./", None, None)
+            return ("./", None)
         else:
-            path = structure[index].path
-            if structure[index].is_dir:
-                file_info = self.getLeftMostFile(structure[index].info)
-                if file_info is None:
-                    return (path, None, None)
-                else:
-                    return (path, file_info[2], file_info[3])
-            else:
-                change_type = structure[index].info[2]
-                return (path, change_type, path)
+            return (structure[index].path, structure[index])
+
+    def getFileInfo(self, meta_info):
+        """
+        return a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
+        """
+        if meta_info is None:
+            return None
+        elif meta_info.is_dir:
+            file_info = self.getLeftMostFile(meta_info.info)
+            return file_info
+        else:
+            return meta_info.info
 
     def _readContent(self, encoding):
         try:
@@ -3344,9 +3350,17 @@ class NavigationPanel(Panel):
         if tree_view is None:
             return
 
-        path, change_type, target_path = tree_view.getFilePath()
+        path, meta_info = tree_view.getFilePath()
         if path is None:
             return
+
+        file_info = tree_view.getFileInfo(meta_info)
+        if file_info is None:
+            change_type = None
+            target_path = None
+        else:
+            change_type = file_info[2]
+            target_path = file_info[3]
 
         if tree_view.getTitle() == "Staged Changes:":
             if change_type == "A":
@@ -3384,6 +3398,9 @@ class NavigationPanel(Panel):
         self.updateTreeview(title, target_path)
 
     def updateTreeview(self, title=None, target_path=None):
+        if target_path is None:
+            title = None
+
         for view in self._tree_views:
             if view is not None:
                 view.cleanup(wipe=False)
@@ -3468,7 +3485,7 @@ class NavigationPanel(Panel):
         if tree_view is None:
             return
 
-        path, change_type, _ = tree_view.getFilePath()
+        path, meta_info = tree_view.getFilePath()
         if path is None:
             return
 
