@@ -1235,6 +1235,7 @@ class TreeView(GitCommandView):
         # to protect self._file_structures
         self._lock = threading.Lock()
         self._file_list = {}
+        self._file_path_list = {}
         self._cur_parent = None
         self._short_stat = {}
         self._num_stat = {}
@@ -1384,6 +1385,7 @@ class TreeView(GitCommandView):
             self._trees[parent] = TreeNode()
             self._file_structures[parent] = []
             self._file_list[parent] = []
+            self._file_path_list[parent] = []
         elif line.startswith(" "):
             parent, tree_node = self._trees.last_key_value()
             self._short_stat[parent] = line
@@ -1398,6 +1400,7 @@ class TreeView(GitCommandView):
                 self._trees[parent] = TreeNode()
                 self._file_structures[parent] = []
                 self._file_list[parent] = []
+                self._file_path_list[parent] = []
 
             parent, tree_node = self._trees.last_key_value()
             root_node = tree_node
@@ -1411,6 +1414,7 @@ class TreeView(GitCommandView):
                                                    "" if source[4] == ""
                                                    else "\t=>\t" + source[4])
                                            )
+            self._file_path_list[parent].append(source[3])
             if mode == "160000": # gitlink
                 directories = file_path.split("/")
             else:
@@ -1912,6 +1916,31 @@ class TreeView(GitCommandView):
             return file_info
         else:
             return meta_info.info
+
+    def getFilePathPair(self):
+        """
+        return (path, next_path)
+        """
+        line_num = vim.current.window.cursor[0]
+        index = line_num - self.startLine()
+        structure = self._file_structures[self._cur_parent]
+        if index < -1 or index >= len(structure):
+            return (None, None)
+
+        # the root
+        if index == -1:
+            return ("./", None)
+
+        file_path_list = self._file_path_list[self._cur_parent]
+        if len(file_path_list) == 1:
+            return (structure[index].path, None)
+        elif index == len(structure) - 1:
+            next_path = file_path_list[-2]
+            return (structure[index].path, next_path)
+        else:
+            file_info = self.getFileInfo(structure[index + 1])
+            next_path = None if file_info is None else file_info[3]
+            return (structure[index].path, next_path)
 
     def _readContent(self, encoding):
         try:
@@ -3485,7 +3514,7 @@ class NavigationPanel(Panel):
         if tree_view is None:
             return
 
-        path, meta_info = tree_view.getFilePath()
+        path, next_path = tree_view.getFilePathPair()
         if path is None:
             return
 
@@ -3522,7 +3551,7 @@ class NavigationPanel(Panel):
 
         ParallelExecutor.run(cmd, directory=self._project_root)
 
-        self.updateTreeview()
+        self.updateTreeview(tree_view.getTitle(), next_path)
 
     def commit(self):
         env = os.environ
