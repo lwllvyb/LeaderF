@@ -2388,16 +2388,18 @@ class UnifiedDiffViewPanel(Panel):
     def register(self, view):
         self._views[view.getBufferName()] = view
 
+    def removeView(self, buffer_name):
+        if buffer_name in self._views:
+            self._views[buffer_name].cleanup(wipe=False)
+            del self._views[buffer_name]
+
+        if buffer_name in self._hidden_views:
+            self._hidden_views[buffer_name].cleanup(wipe=False)
+            del self._hidden_views[buffer_name]
+
     def deregister(self, view):
         # :bw
-        name = view.getBufferName()
-        if name in self._views:
-            self._views[name].cleanup(wipe=False)
-            del self._views[name]
-
-        if name in self._hidden_views:
-            self._hidden_views[name].cleanup(wipe=False)
-            del self._hidden_views[name]
+        self.removeView(view.getBufferName())
 
     def bufHidden(self, view):
         # window is closed if not equal
@@ -2797,7 +2799,10 @@ class UnifiedDiffViewPanel(Panel):
                 lfCmd("call win_gotoid({})".format(winid))
                 if not vim.current.buffer.name: # buffer name is empty
                     lfCmd("setlocal bufhidden=wipe")
+                orig_buf_name = vim.current.buffer.name
                 lfCmd("silent hide edit {}".format(escSpecial(buf_name)))
+                if buf_name == orig_buf_name:
+                    lfCmd("setlocal syntax=ON")
                 abs_file_path = os.path.join(self._project_root, lfGetFilePath(source))
                 lfCmd("let b:lf_git_buffer_name = '%s'" % escQuote(abs_file_path))
                 lfCmd("let b:lf_git_line_num_content = {}".format(str(line_num_content)))
@@ -2820,6 +2825,7 @@ class UnifiedDiffViewPanel(Panel):
                 view.create(winid, bufhidden='hide', buf_content=content)
 
                 buffer_num = int(lfEval("winbufnr({})".format(winid)))
+                self.clear(buffer_num)
                 self.signPlace(added_line_nums, deleted_line_nums, buffer_num)
 
                 self.setLineNumberWin(line_num_content, buffer_num)
@@ -2844,6 +2850,8 @@ class UnifiedDiffViewPanel(Panel):
                           .format(key_map["edit_file"]))
                 lfCmd("nnoremap <buffer> <silent> {} :<C-U>LeaderfGitNavigationOpen<CR>"
                       .format(key_map["open_navigation"]))
+                lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#StageUnstageHunk({})<CR>"
+                      .format(key_map["stage_unstage_hunk"], id(self)))
             else:
                 lfCmd("call win_gotoid({})".format(winid))
                 if not vim.current.buffer.name: # buffer name is empty
@@ -2869,6 +2877,168 @@ class UnifiedDiffViewPanel(Panel):
             else:
                 first_change = change_start_lines[0]
             lfCmd("call win_execute({}, 'norm! {}G0zbzz')".format(winid, first_change))
+
+    def stageUnstageHunk(self):
+        line_num_content = lfEval("b:lf_git_line_num_content")
+        if len(line_num_content) == 0:
+            lfCmd("echohl WarningMsg | redraw | echo 'No hunk under cursor!' | echohl None")
+            return
+
+        line_info = line_num_content[vim.current.window.cursor[0]-1]
+        if not ('-' in line_info or '+' in line_info):
+            lfCmd("echohl WarningMsg | redraw | echo 'No hunk under cursor!' | echohl None")
+            return
+
+        explorer_page_id = int(lfEval("string(b:lf_explorer_page_id)"))
+        navigation_panel = ctypes.cast(explorer_page_id, ctypes.py_object).value._navigation_panel
+        if navigation_panel._ignore_whitespace == True:
+            lfCmd("echohl WarningMsg | redraw | echo 'Please turn off `Ignore Whitespace`!' | echohl None")
+            return
+
+        if len(lfEval("b:lf_change_start_lines")) <= 1:
+            lfCmd("LeaderfGitNavigationOpen")
+            navigation_panel.stageUnstage(focus=False)
+        else:
+            file_name = lfEval("b:lf_git_buffer_name")
+            buffer_name_parts = vim.current.buffer.name.split(":")
+            right_commit = buffer_name_parts[2]
+            if right_commit == "xxx":
+                return
+            elif right_commit.startswith("0000000"):
+                title = "Unstaged Changes:"
+                git_cmd = "git diff --diff-algorithm={} -U5 -- {}".format(navigation_panel._diff_algorithm,
+                                                                          file_name)
+                git_apply_cmd = "git apply --cached --whitespace=nowarn"
+
+                self.removeView(vim.current.buffer.name)
+            else:
+                title = "Staged Changes:"
+                git_cmd = "git diff --cached --diff-algorithm={} -U5 -- {}".format(navigation_panel._diff_algorithm,
+                                                                                   file_name)
+                git_apply_cmd = "git apply -R --cached --whitespace=nowarn"
+
+                buffer_name_parts[2] = "0000000"    # 7 zeros
+                buffer_name = ":".join(buffer_name_parts)
+                self.removeView(buffer_name)
+
+            output = subprocess.run(git_cmd,
+                                    capture_output=True,
+                                    shell=True,
+                                    cwd=self._project_root)
+            if output.stderr != b"":
+                lfPrintError(lfBytes2Str(output.stderr.strip()))
+                return
+
+            change_start_lines = [int(i) for i in lfEval("b:lf_change_start_lines")]
+            index = Bisect.bisect_right(change_start_lines, vim.current.window.cursor[0])
+            line_info = line_num_content[change_start_lines[index-1]-1]
+            line_num, add_del_flag = line_info.split()
+            line_num = int(line_num)
+            add_del_flag = add_del_flag[0]
+            hunk_diff = self.extractHunk(output.stdout, line_num, add_del_flag)
+
+            output = subprocess.run(git_apply_cmd,
+                                    input=hunk_diff,
+                                    capture_output=True,
+                                    shell=True,
+                                    cwd=self._project_root)
+            if output.stderr != b"":
+                lfPrintError("git apply failed! " + lfBytes2Str(output.stderr.strip()))
+                return
+
+            target_path = os.path.relpath(file_name, self._project_root)
+            lfCmd("LeaderfGitNavigationOpen")
+            navigation_panel.updateTreeview(title, target_path, focus=False)
+
+    def extractHunk(self, diff, line_num, add_del_flag):
+        lines = diff.splitlines(keepends=True)
+        header_end = next(i for i, l in enumerate(lines) if l.startswith(b"@@"))
+        header = lines[:header_end]
+        hunk_re = re.compile(
+                rb'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@'
+                )
+        hunk_line = None
+        minus_line_num = 0
+        plus_line_num = 0
+        minus_line_num_start = 0
+        plus_line_num_start = 0
+        block_start = None
+        block_end = None
+
+        def getBlockStart(lines, i):
+            start = i - 1
+            while start >= i - 5:
+                if not lines[start].startswith(b" "):
+                    break
+                start -= 1
+
+            start += 1
+            return start
+
+        for i, line in enumerate(islice(lines, header_end, None), header_end):
+            if block_start is not None:
+                if line.startswith(b"-"):
+                    minus_line_num += 1
+                    block_end += 1
+                elif line.startswith(b"+"):
+                    plus_line_num += 1
+                    block_end += 1
+                else:
+                    for j in range(i, min(i + 5, len(lines))):
+                        if lines[j].startswith(b" "):
+                            minus_line_num += 1
+                            plus_line_num += 1
+                            block_end += 1
+                        else:
+                            break
+                    break
+            elif line.startswith(b"@@"):
+                m = hunk_re.match(line)
+                if add_del_flag == "-":
+                    start = int(m.group(1))
+                    length = int(m.group(2) or 1)
+                else:
+                    start = int(m.group(3))
+                    length = int(m.group(4) or 1)
+
+                if line_num >= start and line_num < start + length:
+                    hunk_line = line
+                    minus_line_num = int(m.group(1)) - 1
+                    plus_line_num = int(m.group(3)) - 1
+            elif hunk_line is not None:
+                if line.startswith(b"-"):
+                    minus_line_num += 1
+                    if add_del_flag == "-" and minus_line_num == line_num:
+                        block_start = getBlockStart(lines, i)
+                        block_end = i + 1
+                        minus_line_num_start = minus_line_num - 1 - (i - block_start) + 1
+                        plus_line_num_start = plus_line_num - (i - block_start) + 1
+                elif line.startswith(b"+"):
+                    plus_line_num += 1
+                    if add_del_flag == "+" and plus_line_num == line_num:
+                        block_start = getBlockStart(lines, i)
+                        block_end = i + 1
+                        minus_line_num_start = minus_line_num - (i - block_start) + 1
+                        plus_line_num_start = plus_line_num - 1 - (i - block_start) + 1
+                else:
+                    minus_line_num += 1
+                    plus_line_num += 1
+
+        hunk_header = b"@@ -%d,%d +%d,%d @@" % (minus_line_num_start,
+                                                minus_line_num - minus_line_num_start + 1,
+                                                plus_line_num_start,
+                                                plus_line_num - plus_line_num_start + 1
+                                                )
+        hunk_header = hunk_header + hunk_line.rsplit(b"@@", 1)[1]
+        return b''.join(header) + hunk_header + b''.join(lines[block_start: block_end])
+
+    def clear(self, buffer_num):
+        lfCmd("silent! call sign_unplace('LeaderF', {'buffer': %d})" % buffer_num)
+        lfCmd("silent! call leaderf#Git#ClearMatches()")
+        if lfEval("has('nvim')") != '1':
+            for property_type in ("Lf_hl_gitDiffDelete", "Lf_hl_gitDiffAdd", "Lf_hl_LineNr"):
+                lfCmd("call prop_remove({'type': '%s', 'bufnr': %d, 'all': 1})"
+                      % (property_type, buffer_num))
 
 
 class NavigationPanel(Panel):
@@ -3300,8 +3470,8 @@ class NavigationPanel(Panel):
 
     def open(self):
         navigation_winid = self.getWindowId()
-        tree_view_id = int(lfEval("b:lf_tree_view_id"))
-        current_file_path = vim.current.buffer.name.rsplit(':', 1)[1]
+        tree_view_id = int(lfEval("string(b:lf_tree_view_id)"))
+        current_file_path = os.path.relpath(lfEval("b:lf_git_buffer_name"), self._project_root)
         if navigation_winid != -1:
             lfCmd("call win_gotoid({})".format(navigation_winid))
             ctypes.cast(tree_view_id, ctypes.py_object).value.locateFile(current_file_path)
@@ -3374,7 +3544,7 @@ class NavigationPanel(Panel):
         cmd = "git show {} -s --decorate --pretty=fuller".format(self._commit_id)
         lfCmd("""call leaderf#Git#ShowCommitMessage(systemlist('{}'))""".format(cmd))
 
-    def stageUnstage(self):
+    def stageUnstage(self, focus=True):
         tree_view = self.getTreeView()
         if tree_view is None:
             return
@@ -3424,9 +3594,9 @@ class NavigationPanel(Panel):
 
         ParallelExecutor.run(cmd, directory=self._project_root)
 
-        self.updateTreeview(title, target_path)
+        self.updateTreeview(title, target_path, focus)
 
-    def updateTreeview(self, title=None, target_path=None):
+    def updateTreeview(self, title=None, target_path=None, focus=True):
         if target_path is None:
             title = None
 
@@ -3442,14 +3612,14 @@ class NavigationPanel(Panel):
                 if flag[0] == False:
                     flag[0] = True
                     kwargs["source_to_open"] = source
-                    kwargs["preview"] = True
+                    kwargs["preview"] = focus
                     self.openDiffView(False, **kwargs)
                     return True
                 else:
                     return False
             elif kwargs["title"] == title:
                 kwargs["source_to_open"] = source
-                kwargs["preview"] = True
+                kwargs["preview"] = focus
                 self.openDiffView(False, **kwargs)
                 return True
             else:
@@ -3465,20 +3635,20 @@ class NavigationPanel(Panel):
                          callback,
                          next_tree_view=partial(createTreeView, cmds[1:]),
                          content_buffer=content_buffer,
-                         cursor_line=cursor_line
-                         ).create(int(lfEval("win_getid()")), bufhidden="hide")
+                         cursor_line=cursor_line if cmds[0].getTitle() == title else None,
+                         ).create(self.getWindowId(), bufhidden="hide")
             else:
-                cur_pos = vim.current.window.cursor
+                line_num, col_num = lfEval("getcurpos({})[1:2]".format(self.getWindowId()))
                 self._buffer.options['modifiable'] = True
                 self._buffer[:] = content_buffer
                 self._buffer.options['modifiable'] = False
-                try:
-                    vim.current.window.cursor = cur_pos
-                except:
-                    pass
+                lfCmd("silent! call win_execute({}, 'norm! {}G{}|')".format(self.getWindowId(),
+                                                                            line_num,
+                                                                            col_num))
 
                 if target_path is not None and cursor_line[0] is not None:
-                    lfCmd("norm! {}G0zz".format(cursor_line[0]))
+                    lfCmd("call win_execute({}, 'norm! {}G0zz')"
+                          .format(self.getWindowId(), cursor_line[0]))
 
                 if len(self._buffer) == len(self._head):
                     lfCmd("only")

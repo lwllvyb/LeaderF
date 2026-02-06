@@ -152,6 +152,7 @@ call s:InitVar('g:Lf_GitKeyMap', {
             \ 'next_change': ']c',
             \ 'edit_file': '<CR>',
             \ 'open_navigation': '=',
+            \ 'stage_unstage_hunk': 's',
             \})
 
 call s:InitDict('g:Lf_GitAlias', {

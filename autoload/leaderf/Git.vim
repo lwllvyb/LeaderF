@@ -931,6 +931,11 @@ function! leaderf#Git#OpenNavigationPanel() abort
     exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.openNavigationPanel()", b:lf_explorer_page_id)
 endfunction
 
+function! leaderf#Git#StageUnstageHunk(diff_view_id) abort
+    exec g:Lf_py "import ctypes"
+    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.stageUnstageHunk()", a:diff_view_id)
+endfunction
+
 function! leaderf#Git#RemoveExtmarks(buffer_num) abort
     let ns_id_0 = nvim_create_namespace('LeaderF_Git_Blame_0')
     for [mark_id, row, col] in nvim_buf_get_extmarks(a:buffer_num, ns_id_0, 0, -1, {})
