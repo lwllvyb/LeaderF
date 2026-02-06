@@ -822,9 +822,9 @@ endfunction
 
 function! leaderf#Git#EditFile(tag) abort
     if a:tag == 0
-        if !filereadable(b:lf_git_buffer_name)
+        if !filereadable(b:lf_git_file_name)
             echohl WarningMsg
-            echo b:lf_git_buffer_name .. " does not exist."
+            echo b:lf_git_file_name .. " does not exist."
             echohl None
             return
         endif
@@ -841,13 +841,13 @@ function! leaderf#Git#EditFile(tag) abort
         let delimiter = get(g:, 'Lf_GitDelimiter', '│')
         let delimiter_len = len(delimiter)
 
-        let buffer_num = bufnr(b:lf_git_buffer_name)
+        let buffer_num = bufnr(b:lf_git_file_name)
         if buffer_num == -1
-            exec "tabedit " . b:lf_git_buffer_name
+            exec "tabedit " . b:lf_git_file_name
         else
             let buf_ids = win_findbuf(buffer_num)
             if len(buf_ids) == 0
-                exec "tabedit " . b:lf_git_buffer_name
+                exec "tabedit " . b:lf_git_file_name
             else
                 call win_gotoid(buf_ids[0])
             endif
@@ -910,7 +910,7 @@ function! leaderf#Git#EditFile(tag) abort
         exec "norm! " . line_num . "G"
         setlocal cursorline! | redraw | sleep 150m | setlocal cursorline!
     else
-        let file_name = b:lf_git_buffer_name
+        let file_name = b:lf_git_file_name
         if b:lf_git_diff_win_pos == 1
             let line_num = line('.')
         else
