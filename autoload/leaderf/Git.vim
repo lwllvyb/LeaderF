@@ -726,23 +726,27 @@ endfunction
 
 function! leaderf#Git#PreviousChange(tag) abort
     if a:tag == 0
-        let n = line('.')
-        let low = 0
-        let high = len(b:lf_change_start_lines)
-        while low < high
-            let mid = (low + high)/2
-            if b:lf_change_start_lines[mid] < n
-                let low = mid + 1
-            else
-                let high = mid
-            endif
-        endwhile
+        for _ in range(v:count1)
+            let n = line('.')
+            let low = 0
+            let high = len(b:lf_change_start_lines)
+            while low < high
+                let mid = (low + high)/2
+                if b:lf_change_start_lines[mid] < n
+                    let low = mid + 1
+                else
+                    let high = mid
+                endif
+            endwhile
 
-        if low - 1 >= 0
-            exec printf("norm! %dG0", b:lf_change_start_lines[low - 1])
-        endif
+            if low - 1 >= 0
+                exec printf("norm! %dG0", b:lf_change_start_lines[low - 1])
+            endif
+        endfor
     else
-        call s:PreviousChange()
+        for _ in range(v:count1)
+            call s:PreviousChange()
+        endfor
     endif
 endfunction
 
@@ -763,24 +767,28 @@ endfunction
 
 function! leaderf#Git#NextChange(tag) abort
     if a:tag == 0
-        let n = line('.')
-        let low = 0
-        let size = len(b:lf_change_start_lines)
-        let high = size
-        while low < high
-            let mid = (low + high)/2
-            if b:lf_change_start_lines[mid] <= n
-                let low = mid + 1
-            else
-                let high = mid
-            endif
-        endwhile
+        for _ in range(v:count1)
+            let n = line('.')
+            let low = 0
+            let size = len(b:lf_change_start_lines)
+            let high = size
+            while low < high
+                let mid = (low + high)/2
+                if b:lf_change_start_lines[mid] <= n
+                    let low = mid + 1
+                else
+                    let high = mid
+                endif
+            endwhile
 
-        if high < size
-            exec printf("norm! %dG0", b:lf_change_start_lines[high])
-        endif
+            if high < size
+                exec printf("norm! %dG0", b:lf_change_start_lines[high])
+            endif
+        endfor
     else
-        call s:NextChange()
+        for _ in range(v:count1)
+            call s:NextChange()
+        endfor
     endif
 endfunction
 
