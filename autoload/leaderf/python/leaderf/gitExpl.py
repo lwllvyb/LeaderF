@@ -2585,6 +2585,7 @@ class UnifiedDiffViewPanel(Panel):
         """
         source is a tuple like (b90f76fc1, bad07e644, R099, src/version.c, src/version2.c)
         """
+        index = 0
         self._project_root = kwargs.get("project_root", None)
         ignore_whitespace = kwargs.get("ignore_whitespace", False)
         diff_algorithm = kwargs.get("diff_algorithm", "myers")
@@ -2800,6 +2801,10 @@ class UnifiedDiffViewPanel(Panel):
                 if not vim.current.buffer.name: # buffer name is empty
                     lfCmd("setlocal bufhidden=wipe")
                 orig_buf_name = vim.current.buffer.name
+                orig_change_start_lines = [
+                        int(i) for i in vim.current.buffer.vars.get("lf_change_start_lines", [])
+                        ]
+                index = Bisect.bisect_right(orig_change_start_lines, vim.current.window.cursor[0])
                 lfCmd("silent hide edit {}".format(escSpecial(buf_name)))
                 if buf_name == orig_buf_name:
                     lfCmd("setlocal syntax=ON")
@@ -2875,7 +2880,12 @@ class UnifiedDiffViewPanel(Panel):
             if len(change_start_lines) == 0:
                 first_change = 1
             else:
-                first_change = change_start_lines[0]
+                if index == 0:
+                    first_change = change_start_lines[0]
+                elif index > len(change_start_lines):
+                    first_change = change_start_lines[-1]
+                else:
+                    first_change = change_start_lines[index-1]
             lfCmd("call win_execute({}, 'norm! {}G0zbzz')".format(winid, first_change))
 
     def stageUnstageHunk(self):
