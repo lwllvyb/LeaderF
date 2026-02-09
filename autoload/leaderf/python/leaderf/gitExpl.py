@@ -3694,7 +3694,7 @@ class NavigationPanel(Panel):
                                                                             col_num))
 
                 if target_path is not None and cursor_line[0] is not None:
-                    lfCmd("call win_execute({}, 'norm! {}G0zz')"
+                    lfCmd("call win_execute({}, 'norm! {}G0')"
                           .format(self.getWindowId(), cursor_line[0]))
 
                 if len(self._buffer) == len(self._head):
