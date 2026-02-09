@@ -53,6 +53,18 @@ def lfGetFilePath(source):
     """
     return source[3] if source[4] == "" else source[4]
 
+def lfConfirm(what):
+    try:
+        selection = int(lfEval("""confirm("{}", "&Yes\n&No")""".format(what)))
+        if selection == 1:
+            return True
+        else:
+            return False
+    except KeyboardInterrupt:
+        return False
+    except vim.error: # for neovim
+        return False
+
 #*****************************************************
 # GitExplorer
 #*****************************************************
@@ -2857,6 +2869,10 @@ class UnifiedDiffViewPanel(Panel):
                       .format(key_map["open_navigation"]))
                 lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#StageUnstageHunk({})<CR>"
                       .format(key_map["stage_unstage_hunk"], id(self)))
+                lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 1)<CR>"
+                      .format(key_map["discard_hunk"], id(self)))
+                lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 0)<CR>"
+                      .format(key_map["discard_hunk_no_prompt"], id(self)))
             else:
                 lfCmd("call win_gotoid({})".format(winid))
                 if not vim.current.buffer.name: # buffer name is empty
@@ -2889,6 +2905,9 @@ class UnifiedDiffViewPanel(Panel):
             lfCmd("call win_execute({}, 'norm! {}G0zbzz')".format(winid, first_change))
 
     def stageUnstageHunk(self):
+        self.processHunk(how="stage", prompt=False)
+
+    def processHunk(self, how, prompt):
         line_num_content = lfEval("b:lf_git_line_num_content")
         if len(line_num_content) == 0:
             lfCmd("echohl WarningMsg | redraw | echo 'No hunk under cursor!' | echohl None")
@@ -2907,7 +2926,10 @@ class UnifiedDiffViewPanel(Panel):
 
         if len(lfEval("b:lf_change_start_lines")) <= 1:
             lfCmd("LeaderfGitNavigationOpen")
-            navigation_panel.stageUnstage(focus=False)
+            if how == "discard":
+                navigation_panel.discard(prompt=prompt)
+            else:
+                navigation_panel.stageUnstage(focus=False)
         else:
             file_name = lfEval("b:lf_git_file_name")
             buffer_name_parts = vim.current.buffer.name.split(":")
@@ -2918,10 +2940,22 @@ class UnifiedDiffViewPanel(Panel):
                 title = "Unstaged Changes:"
                 git_cmd = "git diff --diff-algorithm={} -U5 -- {}".format(navigation_panel._diff_algorithm,
                                                                           file_name)
-                git_apply_cmd = "git apply --cached --whitespace=nowarn"
+                if how == "discard":
+                    if prompt == True:
+                        selection = lfConfirm("Discard this hunk?")
+                        if selection == False:
+                            return
+                    git_apply_cmd = "git apply -R --whitespace=nowarn"
+                else:
+                    git_apply_cmd = "git apply --cached --whitespace=nowarn"
 
                 self.removeView(vim.current.buffer.name)
             else:
+                if how == "discard":
+                    msg = 'Cannot discard staged hunk directly. You should unstage it first.' 
+                    lfCmd("echohl WarningMsg | redraw | echo '{}'| echohl NONE".format(msg))
+                    return
+
                 title = "Staged Changes:"
                 git_cmd = "git diff --cached --diff-algorithm={} -U5 -- {}".format(navigation_panel._diff_algorithm,
                                                                                    file_name)
@@ -3049,6 +3083,9 @@ class UnifiedDiffViewPanel(Panel):
             for property_type in ("Lf_hl_gitDiffDelete", "Lf_hl_gitDiffAdd", "Lf_hl_LineNr"):
                 lfCmd("call prop_remove({'type': '%s', 'bufnr': %d, 'all': 1})"
                       % (property_type, buffer_num))
+
+    def discardHunk(self, prompt):
+        self.processHunk(how="discard", prompt=prompt)
 
 
 class NavigationPanel(Panel):
@@ -3677,19 +3714,7 @@ class NavigationPanel(Panel):
         self._owner.cleanupDiffViewPanel()
         self.updateTreeview()
 
-    def confirm(self, what):
-        try:
-            selection = int(lfEval("""confirm("{}", "&Yes\n&No")""".format(what)))
-            if selection == 1:
-                return True
-            else:
-                return False
-        except KeyboardInterrupt:
-            return False
-        except vim.error: # for neovim
-            return False
-
-    def discard(self):
+    def discard(self, prompt=True):
         tree_view = self.getTreeView()
         if tree_view is None:
             return
@@ -3699,33 +3724,35 @@ class NavigationPanel(Panel):
             return
 
         if tree_view.getTitle() == "Staged Changes:":
-            msg = 'Cannot discard staged changes directly. You can unstage them first.' 
+            msg = 'Cannot discard staged changes directly. You should unstage them first.' 
             lfCmd("echohl WarningMsg | redraw | echo '{}'| echohl NONE".format(msg))
             return
         elif tree_view.getTitle() == "Unstaged Changes:":
             if path == "./":
                 path = shrinkUser(self._project_root)
-            selection = self.confirm("Discard changes to `{}`?".format(path))
-            if selection == False:
-                return
+            if prompt == True:
+                selection = lfConfirm("Discard changes to `{}`?".format(path))
+                if selection == False:
+                    return
+
+            if os.name == 'nt':
+                cmd = 'git checkout -- "{}"'.format(path)
             else:
-                if os.name == 'nt':
-                    cmd = 'git checkout -- "{}"'.format(path)
-                else:
-                    cmd = "git checkout -- {}".format(escSpecial(path))
+                cmd = "git checkout -- {}".format(escSpecial(path))
         elif tree_view.getTitle() == "Untracked files:":
             path_type = "directory" if path.endswith("/") else "file"
-            what = "Remove untracked {} `{}`?".format(path_type, path)
-            if path == "./":
-                what = "Remove all untracked files/directories?"
-            selection = self.confirm(what)
-            if selection == False:
-                return
+            if prompt == True:
+                what = "Remove untracked {} `{}`?".format(path_type, path)
+                if path == "./":
+                    what = "Remove all untracked files/directories?"
+                selection = lfConfirm(what)
+                if selection == False:
+                    return
+
+            if os.name == 'nt':
+                cmd = 'git clean -fdq -- "{}"'.format(path)
             else:
-                if os.name == 'nt':
-                    cmd = 'git clean -fdq -- "{}"'.format(path)
-                else:
-                    cmd = "git clean -fdq -- {}".format(escSpecial(path))
+                cmd = "git clean -fdq -- {}".format(escSpecial(path))
         else:
             return
 

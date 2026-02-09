@@ -1208,6 +1208,8 @@ g:Lf_GitKeyMap                                *g:Lf_GitKeyMap*
             \ 'edit_file': '<CR>',
             \ 'open_navigation': '=',
             \ 'stage_unstage_hunk': 's',
+            \ 'discard_hunk': 'd',
+            \ 'discard_hunk_no_prompt': 'D',
             \ }
 <
     it means you can use [c to jump backwards to the previous start of a change

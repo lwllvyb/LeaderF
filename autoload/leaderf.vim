@@ -153,6 +153,8 @@ call s:InitVar('g:Lf_GitKeyMap', {
             \ 'edit_file': '<CR>',
             \ 'open_navigation': '=',
             \ 'stage_unstage_hunk': 's',
+            \ 'discard_hunk': 'd',
+            \ 'discard_hunk_no_prompt': 'D',
             \})
 
 call s:InitDict('g:Lf_GitAlias', {

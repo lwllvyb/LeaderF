@@ -139,6 +139,7 @@ let s:help = {
             \   "s:             stage or unstage the files",
             \   "c:             commit the staged files",
             \   "d:             discard unstaged changes or remove untracked files",
+            \   "D:             discard unstaged changes or remove untracked files without prompting",
             \   "x:             collapse the parent folder",
             \   "X:             collapse all the children of the current folder",
             \   "f:             fuzzy search files",
@@ -464,6 +465,7 @@ function! leaderf#Git#NavigationPanelMapsForStatus(id) abort
     exec printf('nnoremap <buffer> <silent> c             :exec g:Lf_py "%s.commit()"<CR>', navigation_panel)
     exec printf('nnoremap <buffer> <silent> r             :exec g:Lf_py "%s.refresh()"<CR>', navigation_panel)
     exec printf('nnoremap <buffer> <silent> d             :exec g:Lf_py "%s.discard()"<CR>', navigation_panel)
+    exec printf('nnoremap <buffer> <silent> D             :exec g:Lf_py "%s.discard(False)"<CR>', navigation_panel)
 endfunction
 
 function! leaderf#Git#CloseFloatWin() abort
@@ -942,6 +944,11 @@ endfunction
 function! leaderf#Git#StageUnstageHunk(diff_view_id) abort
     exec g:Lf_py "import ctypes"
     exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.stageUnstageHunk()", a:diff_view_id)
+endfunction
+
+function! leaderf#Git#DiscardHunk(diff_view_id, prompt) abort
+    exec g:Lf_py "import ctypes"
+    exec g:Lf_py printf("ctypes.cast(%d, ctypes.py_object).value.discardHunk(%s)", a:diff_view_id, a:prompt == 0 ? "False" : "True")
 endfunction
 
 function! leaderf#Git#RemoveExtmarks(buffer_num) abort
