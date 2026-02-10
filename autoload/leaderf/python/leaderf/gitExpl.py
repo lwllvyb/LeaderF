@@ -2991,7 +2991,7 @@ class UnifiedDiffViewPanel(Panel):
                 return
 
             target_path = os.path.relpath(file_name, self._project_root)
-            lfCmd("LeaderfGitNavigationOpen")
+            lfCmd("noautocmd LeaderfGitNavigationOpen")
             navigation_panel.updateTreeview(title, target_path, focus=False)
 
     def extractHunk(self, diff, line_num, add_del_flag):
