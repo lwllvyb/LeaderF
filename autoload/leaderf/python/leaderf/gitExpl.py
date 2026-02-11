@@ -2925,7 +2925,7 @@ class UnifiedDiffViewPanel(Panel):
             return
 
         if len(lfEval("b:lf_change_start_lines")) <= 1:
-            lfCmd("LeaderfGitNavigationOpen")
+            lfCmd("noautocmd LeaderfGitNavigationOpen")
             if how == "discard":
                 navigation_panel.discard(prompt=prompt)
             else:
