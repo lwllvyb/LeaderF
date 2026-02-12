@@ -720,7 +720,7 @@ class GitCommandView(object):
 
         if self._buffer is not None:
             self.cleanup()
-            lfCmd("call win_gotoid({})".format(self.getWindowId()))
+            lfCmd("noautocmd call win_gotoid({})".format(self.getWindowId()))
 
         self.init()
 
@@ -1879,7 +1879,7 @@ class TreeView(GitCommandView):
                               .format(self.getWindowId(), cursor_line))
 
                     if self._target_path is None:
-                        lfCmd("call win_gotoid({})".format(self.getWindowId()))
+                        lfCmd("noautocmd call win_gotoid({})".format(self.getWindowId()))
 
                     self._offset_in_content = cur_len
                     lfCmd("redraw")
@@ -2212,11 +2212,11 @@ class DiffViewPanel(Panel):
             lfCmd("noautocmd leftabove vertical new")
             win_ids[0] = int(lfEval("win_getid()"))
         elif win_ids[0] == -1:
-            lfCmd("call win_gotoid({})".format(win_ids[1]))
+            lfCmd("noautocmd call win_gotoid({})".format(win_ids[1]))
             lfCmd("noautocmd leftabove vertical new")
             win_ids[0] = int(lfEval("win_getid()"))
         elif win_ids[1] == -1:
-            lfCmd("call win_gotoid({})".format(win_ids[0]))
+            lfCmd("noautocmd call win_gotoid({})".format(win_ids[0]))
             lfCmd("noautocmd rightbelow vertical new")
             win_ids[1] = int(lfEval("win_getid()"))
 
@@ -2269,11 +2269,11 @@ class DiffViewPanel(Panel):
         if buffer_names[0] in self._views and buffer_names[1] in self._views:
             win_ids = (self._views[buffer_names[0]].getWindowId(),
                        self._views[buffer_names[1]].getWindowId())
-            lfCmd("call win_gotoid({})".format(win_ids[1]))
+            lfCmd("noautocmd call win_gotoid({})".format(win_ids[1]))
             target_winid = win_ids[1]
         elif buffer_names[0] in self._views:
             win_id0 = self._views[buffer_names[0]].getWindowId()
-            lfCmd("call win_gotoid({})".format(win_id0))
+            lfCmd("noautocmd call win_gotoid({})".format(win_id0))
             buf_name1 = self._buffer_names[vim.current.tabpage][1]
             win_id1 = int(lfEval("bufwinid('{}')".format(escQuote(escSpecial(buf_name1)))))
             if  win_id1 == -1:
@@ -2285,7 +2285,7 @@ class DiffViewPanel(Panel):
                 lfCmd("rightbelow vsp {}".format(buffer_names[1]))
                 win_id1 = int(lfEval("win_getid()"))
             else:
-                lfCmd("call win_gotoid({})".format(win_id1))
+                lfCmd("noautocmd call win_gotoid({})".format(win_id1))
 
             if buffer_names[1] in self._hidden_views:
                 self.bufShown(buffer_names[1], win_id1)
@@ -2297,7 +2297,7 @@ class DiffViewPanel(Panel):
             target_winid = win_id1
         elif buffer_names[1] in self._views:
             win_id1 = self._views[buffer_names[1]].getWindowId()
-            lfCmd("call win_gotoid({})".format(win_id1))
+            lfCmd("noautocmd call win_gotoid({})".format(win_id1))
             buf_name0 = self._buffer_names[vim.current.tabpage][0]
             win_id0 = int(lfEval("bufwinid('{}')".format(escQuote(escSpecial(buf_name0)))))
             if  win_id0 == -1:
@@ -2309,7 +2309,7 @@ class DiffViewPanel(Panel):
                 lfCmd("leftabove vsp {}".format(buffer_names[0]))
                 win_id0 = int(lfEval("win_getid()"))
             else:
-                lfCmd("call win_gotoid({})".format(win_id0))
+                lfCmd("noautocmd call win_gotoid({})".format(win_id0))
 
             if buffer_names[0] in self._hidden_views:
                 self.bufShown(buffer_names[0], win_id0)
@@ -2318,7 +2318,7 @@ class DiffViewPanel(Panel):
                 GitCommandView(self, cmd).create(win_id0, bufhidden='hide')
             self.configBuffer(win_id0, 0, source, win_id1, **kwargs)
             self.configBuffer(win_id1, 1, source, win_id1, **kwargs)
-            lfCmd("call win_gotoid({})".format(win_id1))
+            lfCmd("noautocmd call win_gotoid({})".format(win_id1))
             target_winid = win_id1
         else:
             if kwargs.get("mode", '') == 't':
@@ -2328,10 +2328,10 @@ class DiffViewPanel(Panel):
                            for w in vim.current.tabpage.windows]
             elif "winid" in kwargs: # --explorer create
                 win_ids = [kwargs["winid"], 0]
-                lfCmd("call win_gotoid({})".format(win_ids[0]))
+                lfCmd("noautocmd call win_gotoid({})".format(win_ids[0]))
                 lfCmd("noautocmd bel vsp")
                 win_ids[1] = int(lfEval("win_getid()"))
-                lfCmd("call win_gotoid({})".format(win_ids[0]))
+                lfCmd("noautocmd call win_gotoid({})".format(win_ids[0]))
             elif vim.current.tabpage not in self._buffer_names: # Leaderf git diff -s
                 lfCmd("noautocmd tabnew | vsp")
                 tabmove()
@@ -2378,7 +2378,7 @@ class DiffViewPanel(Panel):
                     GitCommandView(self, cmd).create(winid, bufhidden='hide',
                                                      buf_content=outputs[i])
 
-            lfCmd("call win_gotoid({})".format(win_ids[1]))
+            lfCmd("noautocmd call win_gotoid({})".format(win_ids[1]))
 
         if kwargs.get("line_num", None) is not None:
             lfCmd("call win_execute({}, 'norm! {}G0zbzz')"
@@ -2622,7 +2622,7 @@ class UnifiedDiffViewPanel(Panel):
                                                   lfGetFilePath(source))
         if buf_name in self._views:
             winid = self._views[buf_name].getWindowId()
-            lfCmd("call win_gotoid({})".format(winid))
+            lfCmd("noautocmd call win_gotoid({})".format(winid))
             lfCmd("let b:lf_tree_view_id = {}".format(kwargs.get("tree_view_id", 0)))
         else:
             if kwargs.get("mode", '') == 't':
@@ -2634,9 +2634,9 @@ class UnifiedDiffViewPanel(Panel):
             else:
                 win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
                 if win_pos in ["top", "left"]:
-                    lfCmd("wincmd w")
+                    lfCmd("noautocmd wincmd w")
                 else:
-                    lfCmd("wincmd W")
+                    lfCmd("noautocmd wincmd W")
                 winid = int(lfEval("win_getid()"))
 
             if buf_name not in self._hidden_views:
@@ -2816,7 +2816,7 @@ class UnifiedDiffViewPanel(Panel):
                         if change_start != 0:
                             change_start_lines.append(change_start)
 
-                lfCmd("call win_gotoid({})".format(winid))
+                lfCmd("noautocmd call win_gotoid({})".format(winid))
                 if not vim.current.buffer.name: # buffer name is empty
                     lfCmd("setlocal bufhidden=wipe")
                 orig_buf_name = vim.current.buffer.name
@@ -2881,7 +2881,7 @@ class UnifiedDiffViewPanel(Panel):
                 lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 0)<CR>"
                       .format(key_map["discard_hunk_no_prompt"], id(self)))
             else:
-                lfCmd("call win_gotoid({})".format(winid))
+                lfCmd("noautocmd call win_gotoid({})".format(winid))
                 if not vim.current.buffer.name: # buffer name is empty
                     lfCmd("setlocal bufhidden=wipe")
                 lfCmd("silent hide edit {}".format(escSpecial(buf_name)))
@@ -3527,7 +3527,7 @@ class NavigationPanel(Panel):
         tree_view_id = int(lfEval("string(b:lf_tree_view_id)"))
         current_file_path = os.path.relpath(lfEval("b:lf_git_file_name"), self._project_root)
         if navigation_winid != -1:
-            lfCmd("call win_gotoid({})".format(navigation_winid))
+            lfCmd("noautocmd call win_gotoid({})".format(navigation_winid))
             ctypes.cast(tree_view_id, ctypes.py_object).value.locateFile(current_file_path)
             return
 
@@ -3797,7 +3797,7 @@ class NavigationPanel(Panel):
                 )
         winids = lfEval("win_findbuf(bufnr('%s'))" % escQuote(commit_file))
         if len(winids) != 0:
-            lfCmd("call win_gotoid({}) | edit! | norm! gg".format(winids[0]))
+            lfCmd("noautocmd call win_gotoid({}) | edit! | norm! gg".format(winids[0]))
         else:
             lfCmd("silent keepa keepj topleft {}sp {} | silent edit! | norm! gg".format(lfEval("(&lines-3)/2"), commit_file))
 
@@ -4135,7 +4135,7 @@ class ExplorerPage(object):
                 self.getDiffViewPanel().create(self._arguments, source, **kwargs)
 
             if kwargs.get("preview", False) == True:
-                lfCmd("call win_gotoid({})".format(self._navigation_panel.getWindowId()))
+                lfCmd("noautocmd call win_gotoid({})".format(self._navigation_panel.getWindowId()))
 
     def locateFile(self, path, line_num=None, preview=True):
         self._navigation_panel.locateFile(path, line_num, preview)
@@ -5577,7 +5577,7 @@ class GitBlameExplManager(GitExplManager):
         if lfEval("exists('b:lf_blame_file_name')") == "1":
             buf_winid = int(lfEval("bufwinid(b:lf_blame_file_name)"))
             if buf_winid != -1:
-                lfCmd("call win_gotoid({})".format(buf_winid))
+                lfCmd("noautocmd call win_gotoid({})".format(buf_winid))
             else:
                 lfCmd("bel vsp {}".format(lfEval("b:lf_blame_file_name")))
 
