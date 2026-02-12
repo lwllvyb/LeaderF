@@ -1754,6 +1754,7 @@ class TreeView(GitCommandView):
         lfCmd("call win_execute({}, 'setlocal signcolumn=no')".format(winid))
         lfCmd("call win_execute({}, 'setlocal foldmethod=indent')".format(winid))
         lfCmd("call win_execute({}, 'setlocal foldcolumn=1')".format(winid))
+        lfCmd("call win_execute({}, 'setlocal foldlevel=100')".format(winid))
         lfCmd("call win_execute({}, 'setlocal conceallevel=0')".format(winid))
         lfCmd("call win_execute({}, 'setlocal winfixwidth')".format(winid))
         lfCmd("call win_execute({}, 'setlocal winfixheight')".format(winid))
