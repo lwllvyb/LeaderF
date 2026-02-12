@@ -684,13 +684,18 @@ class GitCommandView(object):
     def getSource(self):
         return self._cmd.getSource()
 
-    def start(self):
+    def start(self, sync):
         # start a timer and thread
-        self._timer_id = lfEval("timer_start(100, function('leaderf#Git#WriteBuffer', [%d]), {'repeat': -1})" % id(self))
-
         self._reader_thread = threading.Thread(target=self._readContent, args=(lfEval("&encoding"),))
         self._reader_thread.daemon = True
         self._reader_thread.start()
+
+        if sync == False:
+            self._timer_id = lfEval("timer_start(100, function('leaderf#Git#WriteBuffer', [%d]), {'repeat': -1})" % id(self))
+        else:
+            while self._read_finished != 2:
+                time.sleep(0.05)
+                self.writeBuffer()
 
     def setOptions(self, winid, bufhidden):
         lfCmd("call win_execute({}, 'setlocal nobuflisted')".format(winid))
@@ -709,7 +714,7 @@ class GitCommandView(object):
     def enableColor(self, winid):
         pass
 
-    def create(self, winid, bufhidden='wipe', buf_content=None, format_line=None):
+    def create(self, winid, bufhidden='wipe', buf_content=None, format_line=None, sync=False):
         self._bufhidden = bufhidden
         self._format_line = format_line
 
@@ -753,7 +758,7 @@ class GitCommandView(object):
             self._owner.writeFinished(self.getWindowId())
             return
 
-        self.start()
+        self.start(sync)
 
     def writeBuffer(self):
         if self._read_finished == 2:
@@ -1820,6 +1825,7 @@ class TreeView(GitCommandView):
         if self._cur_parent is None:
             if self._read_finished == 1:
                 self.stopTimer()
+                self._read_finished = 2
                 if self._next_tree_view is not None:
                     self._next_tree_view()
             return
@@ -3683,7 +3689,7 @@ class NavigationPanel(Panel):
                          next_tree_view=partial(createTreeView, cmds[1:]),
                          content_buffer=content_buffer,
                          cursor_line=cursor_line if cmds[0].getTitle() == title else None,
-                         ).create(self.getWindowId(), bufhidden="hide")
+                         ).create(self.getWindowId(), bufhidden="hide", sync=True)
             else:
                 line_num, col_num = lfEval("getcurpos({})[1:2]".format(self.getWindowId()))
                 self._buffer.options['modifiable'] = True
