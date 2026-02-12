@@ -3002,7 +3002,7 @@ class UnifiedDiffViewPanel(Panel):
 
             target_path = os.path.relpath(file_name, self._project_root)
             lfCmd("noautocmd LeaderfGitNavigationOpen")
-            navigation_panel.updateTreeview(title, target_path, focus=False)
+            navigation_panel.updateTreeview(title, target_path, focus=False, sync=True)
 
     def extractHunk(self, diff, line_num, add_del_flag):
         lines = diff.splitlines(keepends=True)
@@ -3651,9 +3651,9 @@ class NavigationPanel(Panel):
 
         ParallelExecutor.run(cmd, directory=self._project_root)
 
-        self.updateTreeview(title, target_path, focus)
+        self.updateTreeview(title, target_path, focus, sync=True)
 
-    def updateTreeview(self, title=None, target_path=None, focus=True):
+    def updateTreeview(self, title=None, target_path=None, focus=True, sync=False):
         if target_path is None:
             title = None
 
@@ -3693,7 +3693,7 @@ class NavigationPanel(Panel):
                          next_tree_view=partial(createTreeView, cmds[1:]),
                          content_buffer=content_buffer,
                          cursor_line=cursor_line if cmds[0].getTitle() == title else None,
-                         ).create(self.getWindowId(), bufhidden="hide", sync=True)
+                         ).create(self.getWindowId(), bufhidden="hide", sync=sync)
             else:
                 line_num, col_num = lfEval("getcurpos({})[1:2]".format(self.getWindowId()))
                 self._buffer.options['modifiable'] = True
@@ -3770,7 +3770,7 @@ class NavigationPanel(Panel):
 
         ParallelExecutor.run(cmd, directory=self._project_root)
 
-        self.updateTreeview(tree_view.getTitle(), next_path)
+        self.updateTreeview(tree_view.getTitle(), next_path, sync=True)
 
     def commit(self):
         env = os.environ
