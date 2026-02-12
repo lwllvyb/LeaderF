@@ -2874,12 +2874,15 @@ class UnifiedDiffViewPanel(Panel):
                           .format(key_map["edit_file"]))
                 lfCmd("nnoremap <buffer> <silent> {} :<C-U>LeaderfGitNavigationOpen<CR>"
                       .format(key_map["open_navigation"]))
-                lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#StageUnstageHunk({})<CR>"
-                      .format(key_map["stage_unstage_hunk"], id(self)))
-                lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 1)<CR>"
-                      .format(key_map["discard_hunk"], id(self)))
-                lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 0)<CR>"
-                      .format(key_map["discard_hunk_no_prompt"], id(self)))
+                explorer_page_id = int(lfEval("string(b:lf_explorer_page_id)"))
+                explorer_page = ctypes.cast(explorer_page_id, ctypes.py_object).value
+                if isinstance(explorer_page._owner, GitStatusExplManager):
+                    lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#StageUnstageHunk({})<CR>"
+                          .format(key_map["stage_unstage_hunk"], id(self)))
+                    lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 1)<CR>"
+                          .format(key_map["discard_hunk"], id(self)))
+                    lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 0)<CR>"
+                          .format(key_map["discard_hunk_no_prompt"], id(self)))
             else:
                 lfCmd("noautocmd call win_gotoid({})".format(winid))
                 if not vim.current.buffer.name: # buffer name is empty
