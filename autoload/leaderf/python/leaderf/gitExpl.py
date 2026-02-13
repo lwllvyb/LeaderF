@@ -3811,6 +3811,7 @@ class NavigationPanel(Panel):
             lfCmd("noautocmd call win_gotoid({}) | edit! | norm! gg".format(winids[0]))
         else:
             lfCmd("silent keepa keepj botright {}sp {} | silent edit! | norm! gg".format(lfEval("(&lines-3)/2"), commit_file))
+            lfCmd("noautocmd resize {}".format(lfEval("(&lines-3)/2")))
 
         lfCmd("setlocal nobuflisted bufhidden=wipe")
         self._init_changedtick = vim.current.buffer.vars["changedtick"]
