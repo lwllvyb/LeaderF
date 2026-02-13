@@ -2625,6 +2625,12 @@ class UnifiedDiffViewPanel(Panel):
             lfCmd("noautocmd call win_gotoid({})".format(winid))
             lfCmd("let b:lf_tree_view_id = {}".format(kwargs.get("tree_view_id", 0)))
         else:
+            explorer_page_id = int(kwargs.get("explorer_page_id", 0))
+            if explorer_page_id != 0:
+                explorer_page = ctypes.cast(explorer_page_id, ctypes.py_object).value
+            else:
+                explorer_page = None
+
             if kwargs.get("mode", '') == 't':
                 lfCmd("noautocmd tabnew")
                 tabmove()
@@ -2632,6 +2638,10 @@ class UnifiedDiffViewPanel(Panel):
             elif "winid" in kwargs: # --explorer
                 winid = kwargs["winid"]
             else:
+                if explorer_page is not None:
+                    lfCmd("noautocmd call win_gotoid({})"
+                          .format(explorer_page._navigation_panel.getWindowId()))
+
                 win_pos = arguments_dict.get("--navigation-position", ["left"])[0]
                 if win_pos in ["top", "left"]:
                     lfCmd("noautocmd wincmd w")
@@ -2856,7 +2866,7 @@ class UnifiedDiffViewPanel(Panel):
                 self.highlightDiff(winid, content, minus_plus_lines)
                 lfCmd("let b:Leaderf_matches = getmatches()")
                 lfCmd("let b:lf_change_start_lines = {}".format(str(change_start_lines)))
-                lfCmd("let b:lf_explorer_page_id = {}".format(kwargs.get("explorer_page_id", 0)))
+                lfCmd("let b:lf_explorer_page_id = {}".format(explorer_page_id))
                 lfCmd("let b:lf_tree_view_id = {}".format(kwargs.get("tree_view_id", 0)))
                 lfCmd("let b:lf_diff_view_mode = 'unified'")
                 lfCmd("let b:lf_diff_view_source = {}".format(str(list(source))))
@@ -2874,9 +2884,7 @@ class UnifiedDiffViewPanel(Panel):
                           .format(key_map["edit_file"]))
                 lfCmd("nnoremap <buffer> <silent> {} :<C-U>LeaderfGitNavigationOpen<CR>"
                       .format(key_map["open_navigation"]))
-                explorer_page_id = int(lfEval("string(b:lf_explorer_page_id)"))
-                explorer_page = ctypes.cast(explorer_page_id, ctypes.py_object).value
-                if isinstance(explorer_page._owner, GitStatusExplManager):
+                if explorer_page is not None and isinstance(explorer_page._owner, GitStatusExplManager):
                     lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#StageUnstageHunk({})<CR>"
                           .format(key_map["stage_unstage_hunk"], id(self)))
                     lfCmd("nnoremap <buffer> <silent> {} :<C-U>call leaderf#Git#DiscardHunk({}, 1)<CR>"
@@ -3802,7 +3810,7 @@ class NavigationPanel(Panel):
         if len(winids) != 0:
             lfCmd("noautocmd call win_gotoid({}) | edit! | norm! gg".format(winids[0]))
         else:
-            lfCmd("silent keepa keepj topleft {}sp {} | silent edit! | norm! gg".format(lfEval("(&lines-3)/2"), commit_file))
+            lfCmd("silent keepa keepj botright {}sp {} | silent edit! | norm! gg".format(lfEval("(&lines-3)/2"), commit_file))
 
         lfCmd("setlocal nobuflisted bufhidden=wipe")
         self._init_changedtick = vim.current.buffer.vars["changedtick"]
