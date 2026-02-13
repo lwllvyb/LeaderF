@@ -2668,7 +2668,7 @@ class UnifiedDiffViewPanel(Panel):
                         git_cmd = 'type "{}"'.format(os.path.normpath(source[3]))
                     else:
                         git_cmd = "cat {}".format(escSpecial(source[3]))
-                    outputs = ParallelExecutor.run(git_cmd, directory=self._project_root)
+                    outputs = ParallelExecutor.run(git_cmd, directory=self._project_root, silent=True)
                     line_num_width = len(str(len(outputs[0])))
                     content = outputs[0]
                     line_num_content = []
